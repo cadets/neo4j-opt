@@ -35,6 +35,7 @@ import java.util.stream.Stream;
 import org.neo4j.collection.pool.Pool;
 import org.neo4j.graphdb.TransactionTerminatedException;
 import org.neo4j.io.pagecache.tracing.cursor.PageCursorTracerSupplier;
+import org.neo4j.kernel.ValueCache;
 import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.api.KeyReadTokenNameLookup;
 import org.neo4j.kernel.api.exceptions.ConstraintViolationTransactionFailureException;
@@ -135,6 +136,7 @@ public class KernelTransactionImplementation implements KernelTransaction, TxSta
     private long commitTime;
     private volatile int reuseCount;
     private volatile Map<String,Object> userMetaData;
+    private ValueCache globalCache, localCache;
 
     /**
      * Lock prevents transaction {@link #markForTermination(Status)}  transaction termination} from interfering with
@@ -160,7 +162,7 @@ public class KernelTransactionImplementation implements KernelTransaction, TxSta
                                             LockTracer lockTracer,
                                             PageCursorTracerSupplier cursorTracerSupplier,
                                             StorageEngine storageEngine,
-                                            AccessCapability accessCapability )
+                                            AccessCapability accessCapability, ValueCache globalCache )
     {
         this.statementOperations = statementOperations;
         this.schemaWriteGuard = schemaWriteGuard;
@@ -177,8 +179,10 @@ public class KernelTransactionImplementation implements KernelTransaction, TxSta
         this.transactionTracer = transactionTracer;
         this.cursorTracerSupplier = cursorTracerSupplier;
         this.storageStatement = storeLayer.newStatement();
+        this.globalCache=globalCache;
+        localCache=new ValueCache();
         this.currentStatement = new KernelStatement( this, this, storageStatement,
-                procedures, accessCapability, lockTracer, statementOperations );
+                procedures, accessCapability, lockTracer, statementOperations, globalCache, localCache);
         this.userMetaData = new HashMap<>();
     }
 

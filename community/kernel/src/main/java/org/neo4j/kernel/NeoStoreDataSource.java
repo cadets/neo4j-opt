@@ -263,6 +263,7 @@ public class NeoStoreDataSource implements Lifecycle, IndexProviders
     private final AvailabilityGuard availabilityGuard;
     private final SystemNanoClock clock;
     private final StoreCopyCheckPointMutex storeCopyCheckPointMutex;
+    private final ValueCache valueCache;
 
     private Dependencies dependencies;
     private LifeSupport life;
@@ -355,6 +356,7 @@ public class NeoStoreDataSource implements Lifecycle, IndexProviders
         this.clock = clock;
         this.accessCapability = accessCapability;
         this.recoveryCleanupWorkCollector = recoveryCleanupWorkCollector;
+        this.valueCache=new ValueCache();
 
         readOnly = config.get( Configuration.read_only );
         this.idController = idController;
@@ -726,7 +728,7 @@ public class NeoStoreDataSource implements Lifecycle, IndexProviders
         KernelTransactions kernelTransactions = life.add( new KernelTransactions( statementLocksFactory,
                 constraintIndexCreator, statementOperationParts, schemaWriteGuard, transactionHeaderInformationFactory,
                 transactionCommitProcess, indexConfigStore, explicitIndexProviderLookup, hooks, transactionMonitor,
-                availabilityGuard, tracers, storageEngine, procedures, transactionIdStore, clock, accessCapability ) );
+                availabilityGuard, tracers, storageEngine, procedures, transactionIdStore, clock, accessCapability, valueCache ) );
 
         buildTransactionMonitor( kernelTransactions, clock, config );
 

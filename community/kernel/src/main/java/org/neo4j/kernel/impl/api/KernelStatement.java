@@ -32,6 +32,7 @@ import java.util.function.Function;
 import org.neo4j.graphdb.NotInTransactionException;
 import org.neo4j.graphdb.TransactionTerminatedException;
 import org.neo4j.io.pagecache.tracing.cursor.PageCursorTracer;
+import org.neo4j.kernel.ValueCache;
 import org.neo4j.kernel.api.AssertOpen;
 import org.neo4j.kernel.api.DataWriteOperations;
 import org.neo4j.kernel.api.ExecutionStatisticsOperations;
@@ -96,19 +97,19 @@ public class KernelStatement implements TxStateHolder, Statement, AssertOpen
     private final LockTracer systemLockTracer;
     private final Deque<StackTraceElement[]> statementOpenCloseCalls;
 
-    public KernelStatement( KernelTransactionImplementation transaction,
-                            TxStateHolder txStateHolder,
-                            StorageStatement storeStatement,
-                            Procedures procedures,
-                            AccessCapability accessCapability,
-                            LockTracer systemLockTracer,
-                            StatementOperationParts statementOperations )
+    public KernelStatement(KernelTransactionImplementation transaction,
+                           TxStateHolder txStateHolder,
+                           StorageStatement storeStatement,
+                           Procedures procedures,
+                           AccessCapability accessCapability,
+                           LockTracer systemLockTracer,
+                           StatementOperationParts statementOperations, ValueCache globalCache, ValueCache localCache)
     {
         this.transaction = transaction;
         this.txStateHolder = txStateHolder;
         this.storeStatement = storeStatement;
         this.accessCapability = accessCapability;
-        this.facade = new OperationsFacade( transaction, this, procedures, statementOperations );
+        this.facade = new OperationsFacade( transaction, this, procedures, statementOperations, globalCache, localCache );
         this.executingQueryList = ExecutingQueryList.EMPTY;
         this.systemLockTracer = systemLockTracer;
         this.statementOpenCloseCalls = RECORD_STATEMENTS_TRACES ? new ArrayDeque<>() : EMPTY_STATEMENT_HISTORY;
@@ -117,7 +118,7 @@ public class KernelStatement implements TxStateHolder, Statement, AssertOpen
     @Override
     public ReadOperations readOperations()
     {
-        assertAllows( AccessMode::allowsReads, "Read" );
+        //assertAllows( AccessMode::allowsReads, "Read" );
         return facade;
     }
 

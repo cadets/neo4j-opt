@@ -32,6 +32,7 @@ import org.neo4j.function.Factory;
 import org.neo4j.graphdb.DatabaseShutdownException;
 import org.neo4j.graphdb.TransactionFailureException;
 import org.neo4j.kernel.AvailabilityGuard;
+import org.neo4j.kernel.ValueCache;
 import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.api.KernelTransactionHandle;
 import org.neo4j.kernel.api.exceptions.Status;
@@ -82,6 +83,7 @@ public class KernelTransactions extends LifecycleAdapter implements Supplier<Ker
     private final Supplier<ExplicitIndexTransactionState> explicitIndexTxStateSupplier;
     private final Clock clock;
     private final ReentrantReadWriteLock newTransactionsLock = new ReentrantReadWriteLock();
+    private ValueCache valueCache;
 
     /**
      * Used to enumerate all transactions in the system, active and idle ones.
@@ -126,7 +128,8 @@ public class KernelTransactions extends LifecycleAdapter implements Supplier<Ker
                                StorageEngine storageEngine,
                                Procedures procedures,
                                TransactionIdStore transactionIdStore,
-                               Clock clock, AccessCapability accessCapability )
+                               Clock clock, AccessCapability accessCapability,
+                               ValueCache valueCache)
     {
         this.statementLocksFactory = statementLocksFactory;
         this.constraintIndexCreator = constraintIndexCreator;
@@ -145,6 +148,7 @@ public class KernelTransactions extends LifecycleAdapter implements Supplier<Ker
         this.explicitIndexTxStateSupplier = () -> new CachingExplicitIndexTransactionState(
                 new ExplicitIndexTransactionStateImpl( indexConfigStore, explicitIndexProviderLookup ) );
         this.clock = clock;
+        this.valueCache=valueCache;
         blockNewTransactions();
     }
 
@@ -327,7 +331,7 @@ public class KernelTransactions extends LifecycleAdapter implements Supplier<Ker
                             constraintIndexCreator, procedures, transactionHeaderInformationFactory,
                             transactionCommitProcess, transactionMonitor, explicitIndexTxStateSupplier, localTxPool,
                             clock, tracers.transactionTracer, tracers.lockTracer, tracers.pageCursorTracerSupplier,
-                            storageEngine, accessCapability );
+                            storageEngine, accessCapability,valueCache );
             this.transactions.add( tx );
             return tx;
         }
