@@ -23,18 +23,25 @@ package org.neo4j.kernel;
 import org.neo4j.values.storable.Value;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class ValueCache {
-    private HashMap<Long, HashMap<Integer, Value>> nodeLabelCache,
+    private LRUCache<Long, HashMap<Integer, Value>> nodeLabelCache,
             nodePropertyCache,
             relationLabelCache,
             relationPropertyCache;
+    int counterRelationGetProp, counterRelationPutProp, counterNodeGetProp, counterNodeSetProp;
 
     public ValueCache() {
-        nodeLabelCache = new HashMap<>();
-        nodePropertyCache = new HashMap<>();
-        relationLabelCache = new HashMap<>();
-        relationPropertyCache = new HashMap<>();
+        nodeLabelCache = new LRUCache<>(100000);
+        nodePropertyCache = new LRUCache<>(100000);
+        relationLabelCache = new LRUCache<>(100000);
+        relationPropertyCache = new LRUCache<>(100000);
+        counterNodeGetProp=0;
+        counterNodeSetProp=0;
+        counterRelationGetProp=0;
+        counterRelationPutProp=0;
     }
 
     private boolean collectionHasData(HashMap<Long, HashMap<Integer, Value>> map1, long var1, int var2) {
@@ -52,7 +59,7 @@ public class ValueCache {
         return null;
     }
 
-    private void addCollectiondata(HashMap<Long, HashMap<Integer, Value>> map1, long var1, int var2, Value var3) {
+    private void addCollectionData(HashMap<Long, HashMap<Integer, Value>> map1, long var1, int var2, Value var3) {
         map1.putIfAbsent(var1, new HashMap<>());
         map1.get(var1).putIfAbsent(var2, var3);
     }
@@ -72,6 +79,7 @@ public class ValueCache {
     }
 
     public Value nodeGetProperty(long nodeId, int propertyKey) {
+        counterNodeGetProp++;
         return getCollectionData(nodePropertyCache, nodeId, propertyKey);
     }
 
@@ -86,11 +94,12 @@ public class ValueCache {
 
 
     public void nodeAddProperty(long nodeId, int propertyId, Value value) {
-        addCollectiondata(nodePropertyCache, nodeId, propertyId, value);
+        counterNodeSetProp++;
+        addCollectionData(nodePropertyCache, nodeId, propertyId, value);
     }
 
     public void nodeAddLabel(long nodeId, int propertyId, Value value) {
-        addCollectiondata(nodeLabelCache, nodeId, propertyId, value);
+        addCollectionData(nodeLabelCache, nodeId, propertyId, value);
     }
 
     public boolean relationHasProperty(long nodeId, int propertyKeyId) {
@@ -98,6 +107,7 @@ public class ValueCache {
     }
 
     public Value relationGetProperty(long nodeId, int propertyKey) {
+        counterRelationGetProp++;
         return getCollectionData(relationPropertyCache, nodeId, propertyKey);
     }
 
@@ -110,11 +120,12 @@ public class ValueCache {
     }
 
     public void relationAddProperty(long nodeId, int propertyId, Value value) {
-        addCollectiondata(relationPropertyCache, nodeId, propertyId, value);
+        counterRelationPutProp++;
+        addCollectionData(relationPropertyCache, nodeId, propertyId, value);
     }
 
     public void relationAddLabel(long nodeId, int propertyId, Value value) {
-        addCollectiondata(relationLabelCache, nodeId, propertyId, value);
+        addCollectionData(relationLabelCache, nodeId, propertyId, value);
     }
 
     public boolean nodeRemoveProperty(long nodeId, int propertyKey) {
@@ -132,6 +143,66 @@ public class ValueCache {
     public boolean relationRemoveLabel(long relationId, int labelKey) {
         return removeCollectionData(nodePropertyCache, relationId, labelKey);
     }
+
+    public class LRUCache<K, V> extends LinkedHashMap<K, V> {
+
+        short hits, counter, windowSize;
+        double targetHitRate;
+        private int cacheSize, maxCacheSize;
+
+        public LRUCache(int cacheSize) {
+            super(16, (float) 0.75, true);
+            this.cacheSize = cacheSize;
+            windowSize = 10000;
+            targetHitRate = 0.5;
+            maxCacheSize = 10000000;
+        }
+
+        protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
+            return size() >= cacheSize;
+        }
+
+        public void updateCacheSize(int newCacheSize) {
+            cacheSize = newCacheSize;
+        }
+
+        public boolean containsNoKey(Object value) {
+
+            boolean result = super.containsKey(value);
+
+            counter++;
+
+            if (result) {
+                hits++;
+            }
+
+            if (counter == windowSize) {
+                counter = 0;
+                hits = 0;
+
+                double hitRate = (float) hits / (float) windowSize;
+                if (hitRate < targetHitRate) {
+                    if ((cacheSize * 2) < maxCacheSize)
+                        updateCacheSize(cacheSize * 2);
+                }
+                if (hitRate > (targetHitRate * 2)) {
+                    if (cacheSize > 1000000)
+                        updateCacheSize(cacheSize / 2);
+                }
+            }
+            return result;
+        }
+
+
+        public V getto(Object key) {
+            if (containsKey(key)) {
+                return super.get(key);
+            }
+
+            return null;
+        }
+    }
+
 
 
 }
