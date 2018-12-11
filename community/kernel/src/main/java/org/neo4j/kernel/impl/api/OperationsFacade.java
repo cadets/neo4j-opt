@@ -126,7 +126,6 @@ public class OperationsFacade
     private StatementOperationParts operations;
     private final ValueCache globalCache,localCache;
 
-    HashMap<Long, HashMap<Integer, Value>> propertyLocalCache;
 
     OperationsFacade(KernelTransaction tx, KernelStatement statement,
                      Procedures procedures, StatementOperationParts operationParts , ValueCache globalCache, ValueCache localCache)
