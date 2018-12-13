@@ -40,6 +40,7 @@ import org.neo4j.kernel.internal.GraphDatabaseAPI;
 import org.neo4j.storageengine.api.StorageEngine;
 import org.neo4j.storageengine.api.StoreReadLayer;
 import org.neo4j.test.TestGraphDatabaseFactory;
+import org.neo4j.kernel.ValueCache;
 
 import static org.neo4j.graphdb.Label.label;
 
@@ -67,7 +68,7 @@ public abstract class StorageLayerTest
         DependencyResolver resolver = db.getDependencyResolver();
         this.disk = resolver.resolveDependency( StorageEngine.class ).storeReadLayer();
         this.state = new KernelStatement( null, null, disk.newStatement(), new Procedures(), new CanWrite(),
-                LockTracer.NONE, null );
+                LockTracer.NONE, null ,null, new ValueCache());
     }
 
     protected GraphDatabaseService createGraphDatabase()

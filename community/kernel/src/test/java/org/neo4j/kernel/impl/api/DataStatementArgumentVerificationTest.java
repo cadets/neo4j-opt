@@ -109,6 +109,6 @@ public class DataStatementArgumentVerificationTest
     private OperationsFacade stubStatement()
     {
         return new OperationsFacade( mock(KernelTransaction.class), mock( KernelStatement.class ), new Procedures(),
-                mock( StatementOperationParts.class ) );
+                mock( StatementOperationParts.class ) , null, null);
     }
 }

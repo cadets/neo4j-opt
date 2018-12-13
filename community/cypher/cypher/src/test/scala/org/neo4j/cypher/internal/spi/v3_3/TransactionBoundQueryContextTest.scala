@@ -66,7 +66,7 @@ class TransactionBoundQueryContextTest extends CypherFunSuite {
     val storeStatement = mock[StorageStatement]
     val operations = mock[StatementOperationParts](RETURNS_DEEP_STUBS)
     statement = new KernelStatement(kernelTransaction, null, storeStatement, new Procedures(), new CanWrite(),
-      LockTracer.NONE, operations)
+      LockTracer.NONE, operations,null,null)
     statement.initialize(null, PageCursorTracerSupplier.NULL.get())
     statement.acquire()
   }

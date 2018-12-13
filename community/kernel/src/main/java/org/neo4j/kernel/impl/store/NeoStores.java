@@ -559,7 +559,7 @@ public class NeoStores implements AutoCloseable
     CommonAbstractStore createRelationshipStore( String storeName )
     {
         File file = getStoreFile( storeName );
-        return initialize( new RelationshipStore( file, config, idGeneratorFactory, pageCache, logProvider,
+        return initialize( new NeGraphRelationshipStore(file, config, idGeneratorFactory, pageCache, logProvider,
                 recordFormats, openOptions ) );
     }
 

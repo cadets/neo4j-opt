@@ -25,7 +25,7 @@ import org.neo4j.kernel.impl.factory.CanWrite;
 import org.neo4j.kernel.impl.locking.LockTracer;
 import org.neo4j.kernel.impl.proc.Procedures;
 import org.neo4j.storageengine.api.StorageStatement;
-
+import org.neo4j.kernel.ValueCache;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -79,6 +79,6 @@ public class StatementLifecycleTest
             StorageStatement storageStatement )
     {
         return new KernelStatement( transaction, null, storageStatement, new Procedures(), new CanWrite(),
-                LockTracer.NONE, mock( StatementOperationParts.class ) );
+                LockTracer.NONE, mock( StatementOperationParts.class ) , new ValueCache(), new ValueCache());
     }
 }

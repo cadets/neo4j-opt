@@ -216,6 +216,21 @@ public class RelationshipRecord extends PrimitiveRecord
         return record;
     }
 
+    public RelationshipRecord copy(RelationshipRecord record){
+        record.firstInFirstChain=firstInFirstChain;
+        record.firstInSecondChain=firstInSecondChain;
+        record.firstNextRel=firstNextRel;
+        record.firstNode=firstNode;
+        record.firstPrevRel=firstPrevRel;
+        record.secondNextRel=secondNextRel;
+        record.secondNode=secondNode;
+        record.secondPrevRel=secondPrevRel;
+        record.type=type;
+        record.setInUse(this.inUse());
+        record.setNextProp(this.getNextProp());
+        return record;
+    }
+
     @Override
     public void setIdTo( PropertyRecord property )
     {

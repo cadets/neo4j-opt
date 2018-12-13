@@ -166,4 +166,7 @@ public class RelationshipRecordFormat extends BaseOneByteHeaderRecordFormat<Rela
             markAsUnused( cursor );
         }
     }
+    public void markUnused(PageCursor cursor){
+        markAsUnused(cursor);
+    }
 }

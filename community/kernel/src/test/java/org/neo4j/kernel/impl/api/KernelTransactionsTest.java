@@ -560,7 +560,7 @@ public class KernelTransactionsTest
                 null, statementOperations, null, DEFAULT,
                 commitProcess, null, null, new TransactionHooks(), mock( TransactionMonitor.class ),
                 availabilityGuard,
-                tracers, storageEngine, new Procedures(), transactionIdStore, clock, new CanWrite() );
+                tracers, storageEngine, new Procedures(), transactionIdStore, clock, new CanWrite() , null);
     }
 
     private static TestKernelTransactions createTestTransactions( StorageEngine storageEngine,
@@ -627,7 +627,7 @@ public class KernelTransactionsTest
                     txHeaderFactory, transactionCommitProcess, indexConfigStore, explicitIndexProviderLookup, hooks,
                     transactionMonitor, availabilityGuard, tracers, storageEngine, procedures, transactionIdStore,
                     clock,
-                    accessCapability );
+                    accessCapability, null );
         }
 
         @Override

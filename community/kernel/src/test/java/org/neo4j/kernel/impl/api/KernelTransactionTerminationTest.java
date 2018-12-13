@@ -336,7 +336,7 @@ public class KernelTransactionTerminationTest
                     mock( TransactionCommitProcess.class ), monitor, () -> mock( ExplicitIndexTransactionState.class ),
                     mock( Pool.class ), Clocks.fakeClock(), TransactionTracer.NULL,
                     LockTracer.NONE, PageCursorTracerSupplier.NULL,
-                            mock( StorageEngine.class, RETURNS_MOCKS ), new CanWrite() );
+                            mock( StorageEngine.class, RETURNS_MOCKS ), new CanWrite() , null);
 
             this.monitor = monitor;
         }
