@@ -39,7 +39,7 @@ import java.util.List;
 
 public class RocksDBInterface {
 
-    private static final String[] names = {"ettoin", "edgetype", "startbuffer", "lastbuffer", "buffercount", "ne4jIdToNeGraphId"};
+    private static final String[] names = {"inUse", "edgetype", "startbuffer", "lastbuffer", "buffercount", "ne4jIdToNeGraphId"};
 
     static {
         RocksDB.loadLibrary();
@@ -98,8 +98,6 @@ public class RocksDBInterface {
             optionsNew.setErrorIfExists(false);
             db = RocksDB.open(optionsNew, databasePath,
                     columnFamilyDescriptors, columnFamilyHandles);
-            assert (db != null);
-            System.out.println(columnFamilyHandles.size());
             assert (db != null);
         } catch (RocksDBException e) {
             System.err.println(e.toString() + "RocksDB Not working");

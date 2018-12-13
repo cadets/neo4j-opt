@@ -63,9 +63,9 @@ public class NeGraphRelationshipStore extends RelationshipStore {
         fileStorageLayerInterface = new FileStorageLayerInterface(fileName.getPath() + "negraph");
     }
 
-    HashMap<Long, RelationshipRecord> recordCache;
+    private HashMap<Long, RelationshipRecord> recordCache;
 
-    Deque<Long> updatedSinceLastFlush;
+    private Deque<Long> updatedSinceLastFlush;
    /**
      * Acquires a {@link PageCursor} from the {@link PagedFile store file} and reads the requested record
      * in the correct page and offset.

@@ -22,10 +22,10 @@ package org.cam.storage.levelgraph.datatypes;
 import org.cam.storage.levelgraph.dataUtils.PrimitiveDeserialiser;
 import org.cam.storage.levelgraph.dataUtils.PrimitiveSerialiser;
 import org.neo4j.graphdb.Node;
-import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.RelationshipType;
+import org.neo4j.kernel.impl.store.record.RelationshipRecord;
 
-public class Edge extends PropertyWrapper implements StorableData, Relationship {
+public class Edge extends RelationshipRecord implements StorableData {
 
     private long neighbour, edgeid, node;
     private Direction direction;
@@ -33,7 +33,10 @@ public class Edge extends PropertyWrapper implements StorableData, Relationship 
     private long creatingTransaction;
     private long deletingTransaction;
 
+
+
     public Edge(long from, long neighbour, long edgeid, Character direction, PropertyEntity properties) {
+        super(edgeid);
         node = from;
         this.neighbour = neighbour;
         this.edgeid = edgeid;
@@ -42,6 +45,7 @@ public class Edge extends PropertyWrapper implements StorableData, Relationship 
     }
 
     public Edge(long from, long neighbour, long edgeid) {
+        super(edgeid);
         node = from;
         this.neighbour = neighbour;
         this.edgeid = edgeid;
@@ -49,6 +53,7 @@ public class Edge extends PropertyWrapper implements StorableData, Relationship 
         this.props = null;
     }
     public Edge(long from, long neighbour, long edgeid, Direction direction, PropertyEntity properties) {
+        super(edgeid);
         node = from;
         this.neighbour = neighbour;
         this.edgeid = edgeid;
@@ -57,6 +62,7 @@ public class Edge extends PropertyWrapper implements StorableData, Relationship 
     }
 
     public Edge(long neighbour, long edgeid, Character direction, PropertyEntity properties) {
+        super(edgeid);
         this.neighbour = neighbour;
         this.edgeid = edgeid;
         this.direction = new Direction(direction);
@@ -64,6 +70,7 @@ public class Edge extends PropertyWrapper implements StorableData, Relationship 
     }
 
     public Edge(long neighbour, long edgeid, Direction direction, PropertyEntity properties) {
+        super(edgeid);
         this.neighbour = neighbour;
         this.edgeid = edgeid;
         this.direction = direction;
@@ -71,6 +78,7 @@ public class Edge extends PropertyWrapper implements StorableData, Relationship 
     }
 
     public Edge(byte[] bytes) {
+        super(-1);
         int index = 1;
         neighbour = getLong(bytes, index);
         index = 9;
@@ -81,6 +89,7 @@ public class Edge extends PropertyWrapper implements StorableData, Relationship 
         direction = new Direction((char) bytes[index]);
         creatingTransaction = -1;
         deletingTransaction = -1;
+        super.setId(edgeid);
     }
 
     private long getLong(byte[] bytes, int index) {
@@ -215,45 +224,7 @@ public class Edge extends PropertyWrapper implements StorableData, Relationship 
         return edgeid;
     }
 
-    @Override
-    public long getId() {
-        return edgeid;
-    }
 
-    @Override
-    public void delete() {
-
-    }
-
-    @Override
-    public Node getStartNode() {
-        return null;
-    }
-
-    @Override
-    public Node getEndNode() {
-        return null;
-    }
-
-    @Override
-    public Node getOtherNode(Node node) {
-        return null;
-    }
-
-    @Override
-    public Node[] getNodes() {
-        return new Node[0];
-    }
-
-    @Override
-    public RelationshipType getType() {
-        return null;
-    }
-
-    @Override
-    public boolean isType(RelationshipType relationshipType) {
-        return false;
-    }
 
     @Override
     public Long getDataId() {
