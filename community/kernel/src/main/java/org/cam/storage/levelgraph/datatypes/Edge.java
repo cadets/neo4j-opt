@@ -37,8 +37,9 @@ public class Edge extends RelationshipRecord implements StorableData {
 
     public Edge(long from, long neighbour, long edgeid, Character direction, PropertyEntity properties) {
         super(edgeid);
-        node = from;
-        this.neighbour = neighbour;
+        setFirstNode(from);
+        setSecondNode(neighbour);
+
         this.edgeid = edgeid;
         this.direction = new Direction(direction);
         this.props = properties;
@@ -46,6 +47,8 @@ public class Edge extends RelationshipRecord implements StorableData {
 
     public Edge(long from, long neighbour, long edgeid) {
         super(edgeid);
+        setFirstNode(from);
+        setSecondNode(neighbour);
         node = from;
         this.neighbour = neighbour;
         this.edgeid = edgeid;
