@@ -19,6 +19,7 @@
  */
 package org.neo4j.kernel.impl.store;
 
+import org.cam.storage.levelgraph.storage.NeRelationshipStore;
 import org.cam.storage.levelgraph.storage.ondiskstorage.FileStorageLayerInterface;
 import org.neo4j.helpers.collection.Visitor;
 import org.neo4j.io.pagecache.PageCache;
@@ -46,6 +47,9 @@ import static org.neo4j.io.pagecache.PagedFile.PF_SHARED_WRITE_LOCK;
 
 public class NeGraphRelationshipStore extends RelationshipStore {
     FileStorageLayerInterface fileStorageLayerInterface;
+    NeRelationshipStore store;
+    private HashMap<Long, RelationshipRecord> recordCache;
+    private Deque<Long> updatedSinceLastFlush;
 
     public NeGraphRelationshipStore(
             File fileName,
@@ -58,15 +62,13 @@ public class NeGraphRelationshipStore extends RelationshipStore {
         super(fileName, configuration, idGeneratorFactory,
                 pageCache, logProvider, recordFormats,
                 openOptions);
+        store = new NeRelationshipStore(fileName.getPath() + "nerelation", pageCache);
         recordCache = new HashMap<>();
         updatedSinceLastFlush = new ArrayDeque<>();
         fileStorageLayerInterface = new FileStorageLayerInterface(fileName.getPath() + "negraph");
     }
 
-    private HashMap<Long, RelationshipRecord> recordCache;
-
-    private Deque<Long> updatedSinceLastFlush;
-   /**
+    /**
      * Acquires a {@link PageCursor} from the {@link PagedFile store file} and reads the requested record
      * in the correct page and offset.
      *
@@ -80,12 +82,9 @@ public class NeGraphRelationshipStore extends RelationshipStore {
         if (recordCache.containsKey(id)) {
             return recordCache.get(id).copy(record);
         }
-        try{
-            fileStorageLayerInterface.returnRecord(id, record);
-        }catch (RocksDBException e){
-            super.getRecord(id,record,mode);
-            throw new UnderlyingStorageException(new Exception());
-        }
+        store.getRecord(id, record, mode);
+//            fileStorageLayerInterface.returnRecord(id, record);
+        super.getRecord(id, record, mode);
         return record;
     }
 
@@ -96,38 +95,21 @@ public class NeGraphRelationshipStore extends RelationshipStore {
             recordCache.get(id).copy(record);
             return;
         }
-        try{
-            fileStorageLayerInterface.returnRecord(id,record);
-
-        }catch (RocksDBException e){
-
-            super.readIntoRecord(id, record, mode, cursor);
-            throw new UnderlyingStorageException(new Exception());
-        }
+        store.readIntoRecord(id, record, mode, cursor);
+        super.readIntoRecord(id, record, mode, cursor);
     }
 
     @Override
     public void updateRecord(RelationshipRecord record) {
-        if (updatedSinceLastFlush.size() > 10000) {
-            while (updatedSinceLastFlush.size() > 0) {
-                long id1= updatedSinceLastFlush.getFirst();
-                updatedSinceLastFlush.removeFirst();
-                if(recordCache.containsKey(id1)) {
-                    super.updateRecord(recordCache.get(id1));
-                    recordCache.remove(id1);
-                }
-            }
-        }
-        long id=record.getId();
-
+        long id = record.getId();
         if (!record.inUse()) {
             recordCache.remove(id);
-            long pageId = pageIdForRecord( id );
+            long pageId = pageIdForRecord(id);
             freeId(record.getId());
-            try ( PageCursor cursor = storeFile.io( pageId, PF_SHARED_WRITE_LOCK ) ) {
-                ((RelationshipRecordFormat)recordFormat).markUnused(cursor);
-            }catch (IOException e){
-                throw new UnderlyingStorageException( e );
+            try (PageCursor cursor = storeFile.io(pageId, PF_SHARED_WRITE_LOCK)) {
+                ((RelationshipRecordFormat) recordFormat).markUnused(cursor);
+            } catch (IOException e) {
+                throw new UnderlyingStorageException(e);
             }
         }
         if ((!record.inUse() || !record.requiresSecondaryUnit()) && record.hasSecondaryUnitId()) {
@@ -136,13 +118,11 @@ public class NeGraphRelationshipStore extends RelationshipStore {
             freeId(record.getSecondaryUnitId());
             return;
         }
-        recordCache.put(id, record);
-        updatedSinceLastFlush.add(id);
-        fileStorageLayerInterface.addRecord(record,id);
-
+        store.updateRecord(record);
         super.updateRecord(record);
     }
-/**************************************************************************************************************/
+
+    /**************************************************************************************************************/
     @Override
     void initialise(boolean createIfNotExists) {
         super.initialise(createIfNotExists);

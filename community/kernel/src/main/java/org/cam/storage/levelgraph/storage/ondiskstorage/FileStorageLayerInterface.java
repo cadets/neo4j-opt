@@ -126,12 +126,12 @@ public class FileStorageLayerInterface {
     }
 
     public LevelNode getNode(LevelNode levelNode) {
-        Long internalId = rocksDBInterface.getValue(levelNode.getInternalId(), 0);
-        LevelNode result = null;
-        if (internalId != -1) {
-            result = new LevelNode(internalId);
-        }
-        return result;
+//        Long internalId = rocksDBInterface.getValue(levelNode.getInternalId(), 0);
+//        LevelNode result = null;
+//        if (internalId != -1) {
+//            result = new LevelNode(internalId);
+//        }
+        return levelNode;
     }
 
     public RelationshipRecord returnRecord(long neo4jId, RelationshipRecord record) throws RocksDBException{
