@@ -25,43 +25,31 @@ public class NeRelationshipStore {
     public static final int dataPageSize = 4096, metaDataPageSize = 4096, nodeHeader = 25;
     public static final int recordSize = 6, recordsPerPage = 4096 / 6;
     public static final int metadataBlock = 57; //8+1+8+8+32
-    PagedFile dataStore, metadataStore, nodePrev;
+    PagedFile dataStore, metadataStore, nodePrev, offsetWriter;
     ArrayList<Long> offsets;
     HashMap<Long, OffsetData> nodeOffset;
     long currentOffset;
-    BufferedWriter offsetWriter;
     RocksDBInterface rocksDBInterface;
+
     public NeRelationshipStore(String filename, PageCache pageCache) {
         nodeOffset = new HashMap<>();
         currentOffset = 0;
+        offsets=new ArrayList<>();
         try {
             dataStore = pageCache.map(new File(filename), dataPageSize, StandardOpenOption.CREATE);
             metadataStore = pageCache.map(new File(filename + ".meta"), metaDataPageSize, StandardOpenOption.CREATE);
             nodePrev = pageCache.map(new File(filename + ".nodep"), metaDataPageSize, StandardOpenOption.CREATE);
-            File loffsetFile = new File(filename+".offset");
+            offsetWriter = pageCache.map(new File(filename + ".offset"), metaDataPageSize, StandardOpenOption.CREATE);
 
-            if(!loffsetFile.exists()) {
-                loffsetFile.createNewFile(); //creating it
-            }
-
-            offsetWriter = new BufferedWriter(new FileWriter(filename + ".offset", true));
-            BufferedReader reader = new BufferedReader(new FileReader(filename + ".offset"));
-            int value;
-            value = reader.read();
-            long tempValue = 0;
-            int counter = 0;
-            while (value != -1) {
-                tempValue <<= 8;
-                tempValue += value;
-                counter++;
-                if (counter == 8) {
-                    offsets.add(tempValue);
-                    counter = 0;
-                }
-                value = reader.read();
+            PageCursor cursor = offsetWriter.io(0, PagedFile.PF_SHARED_READ_LOCK);
+            while (cursor.next()) {
+                int value;
+                long tempValue = cursor.getLong();
+                offsets.add(tempValue);
             }
             if (offsets.size() > 0)
                 currentOffset = offsets.get(offsets.size() - 1);
+
         } catch (IOException e) {
             throw new UnderlyingStorageException(e);
         }
@@ -229,37 +217,37 @@ public class NeRelationshipStore {
 
     public void readIntoRecord(long id, RelationshipRecord record, RecordLoad mode, PageCursor cursor) throws IOException {
         int firstNode, firstOffset, secondNode, secondOffset;
-            long pageId = pageIdForRecord(id);
-            int offset = offetForRecord(id);
-            if (cursor.next(pageId)) {
-                do {
-                    prepareForReading(cursor, offset, record);
-                    byte header = cursor.getByte();
-                    boolean inUse = (header & 0x1) != 0;
-                    record.setInUse(inUse);
-                    if (mode.shouldLoad(inUse)) {
-                        record.setFirstInFirstChain((header & 0x2) != 0);
-                        record.setFirstInSecondChain((header & 0x4) != 0);
-                        byte[] data = new byte[5];
-                        cursor.getBytes(data, 0, 5);
-                        firstNode = (int) (data[0]) + ((int) data[1]) << 8;
-                        secondNode = (int) (data[2]) + ((int) data[3]) << 8;
-                        firstOffset = data[4] & (0x3f);
-                        secondOffset = (data[4] & (0xc0)) >> 2 + (header & (0xf0)) >> 4;
-                        fillNodeData(id, firstNode, secondNode, firstOffset, secondOffset, record);
-                    }
-                } while (cursor.shouldRetry());
-            }
+        long pageId = pageIdForRecord(id);
+        int offset = offetForRecord(id);
+        if (cursor.next(pageId)) {
+            do {
+                prepareForReading(cursor, offset, record);
+                byte header = cursor.getByte();
+                boolean inUse = (header & 0x1) != 0;
+                record.setInUse(inUse);
+                if (mode.shouldLoad(inUse)) {
+                    record.setFirstInFirstChain((header & 0x2) != 0);
+                    record.setFirstInSecondChain((header & 0x4) != 0);
+                    byte[] data = new byte[5];
+                    cursor.getBytes(data, 0, 5);
+                    firstNode = (int) (data[0]) + ((int) data[1]) << 8;
+                    secondNode = (int) (data[2]) + ((int) data[3]) << 8;
+                    firstOffset = data[4] & (0x3f);
+                    secondOffset = (data[4] & (0xc0)) >> 2 + (header & (0xf0)) >> 4;
+                    fillNodeData(id, firstNode, secondNode, firstOffset, secondOffset, record);
+                }
+            } while (cursor.shouldRetry());
+        }
     }
 
     void updateNodeBlock(long nodeId, long relationId) {
         if (!nodeOffset.containsKey(nodeId)) {
             long prev;
-            try(PageCursor cursor= nodePrev.io(0, PagedFile.PF_SHARED_READ_LOCK)){
-                cursor.next(nodeId/metaDataPageSize);
-                prev=cursor.getLong((int)(nodeId%metaDataPageSize));
+            try (PageCursor cursor = nodePrev.io(0, PagedFile.PF_SHARED_READ_LOCK)) {
+                cursor.next(nodeId / metaDataPageSize);
+                prev = cursor.getLong((int) (nodeId % metaDataPageSize));
                 initialiseNodeBlock(currentOffset, nodeId, prev);
-            }catch (IOException e){
+            } catch (IOException e) {
                 throw new UnderlyingStorageException(e);
             }
 
@@ -285,7 +273,7 @@ public class NeRelationshipStore {
     public void updateRecord(RelationshipRecord record) {
         if (record.isCreated()) {
             if ((record.getId() % 65536) == 0) {
-                metadataFlush();
+                metadataFlush((int)(record.getId()/65536));
             }
             updateNodeBlock(record.getFirstNode(), record.getId());
             updateNodeBlock(record.getSecondNode(), record.getId());
@@ -294,12 +282,12 @@ public class NeRelationshipStore {
     }
 
     void initialiseNodeBlock(long offset, long nodeId, long prev) {
-        try(PageCursor cursor= nodePrev.io(0, PagedFile.PF_SHARED_READ_LOCK)){
-                cursor.next(nodeId/metaDataPageSize);
-                cursor.putLong((int) nodeId%metaDataPageSize, prev);
-            }catch (IOException e){
-                throw new UnderlyingStorageException(e);
-            }
+        try (PageCursor cursor = nodePrev.io(0, PagedFile.PF_SHARED_READ_LOCK)) {
+            cursor.next(nodeId / metaDataPageSize);
+            cursor.putLong((int) nodeId % metaDataPageSize, prev);
+        } catch (IOException e) {
+            throw new UnderlyingStorageException(e);
+        }
         try (PageCursor cursor = metadataStore.io(0, PagedFile.PF_SHARED_READ_LOCK)) {
             cursor.next(pageIdForNodeRecord(prev));
             cursor.putLong(offsetForNodeRecord(prev) + 17, offset);
@@ -315,13 +303,12 @@ public class NeRelationshipStore {
         }
     }
 
-    void metadataFlush() {
+    void metadataFlush(int offset) {
         nodeOffset.clear();
         try {
-            for (int i = 0; i < 8; i++) {
-                int data = (int) ((currentOffset >> (i * 8)) & 0xFL);
-                offsetWriter.write(data);
-            }
+                PageCursor cursor = offsetWriter.io(0, PagedFile.PF_SHARED_READ_LOCK);
+                cursor.putLong(offset,currentOffset);
+
         } catch (IOException e) {
             throw new UnderlyingStorageException(e);
         }
