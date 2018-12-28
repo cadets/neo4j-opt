@@ -83,8 +83,12 @@ public class NeGraphRelationshipStore extends RelationshipStore {
             return recordCache.get(id).copy(record);
         }
         store.getRecord(id, record, mode);
+        RelationshipRecord duplicate=record.clone();
 //            fileStorageLayerInterface.returnRecord(id, record);
         super.getRecord(id, record, mode);
+        if(!duplicate.equals(record)){
+            duplicate.equals(record);
+        }
         return record;
     }
 
@@ -96,7 +100,11 @@ public class NeGraphRelationshipStore extends RelationshipStore {
             return;
         }
         store.readIntoRecord(id, record, mode, cursor);
+        RelationshipRecord duplicate=record.clone();
         super.readIntoRecord(id, record, mode, cursor);
+        if(!duplicate.equals(record)){
+            duplicate.equals(record);
+        }
     }
 
     @Override
@@ -119,7 +127,11 @@ public class NeGraphRelationshipStore extends RelationshipStore {
             return;
         }
         store.updateRecord(record);
+        RelationshipRecord duplicate=record.clone();
         super.updateRecord(record);
+        if(!duplicate.equals(record)){
+            duplicate.equals(record);
+        }
     }
 
     /**************************************************************************************************************/
