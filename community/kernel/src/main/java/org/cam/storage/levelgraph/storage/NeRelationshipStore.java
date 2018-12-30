@@ -26,9 +26,15 @@ public class NeRelationshipStore {
 
     public static final int dataPageSize = 4096, metaDataPageSize = 4096, nodeHeader = 25;
     public static final int recordSize = 6, recordsPerPage = 4096 / 6;
+   /*
+   Record: 4 bits flag.
+   44 bits of node id and node offset data.
+   6 bits of offset and 16 bits of id for each node.
+    */
+
     /*
     Metadata format
-    8+1+8+8+32
+    8+1+8+8+32=25+32=57
     NodeId, count, prevblock, nextblock, 4* nodeIds
      */
 
@@ -47,6 +53,35 @@ public class NeRelationshipStore {
     PageCache pageCache;
     String filename;
 
+    long pageIdFromOffset(long index){
+
+        return (index/(long)dataPageSize);
+    }
+
+    void clearPage(PageCursor cursor, long pageId, int offsetBegin, int offsetEnd) throws IOException{
+        cursor.next(pageId);
+        for (int currOffset=offsetBegin; currOffset<offsetEnd; currOffset++){
+            cursor.putByte(currOffset,(byte) 0);
+        }
+    }
+
+    void cleanNodeData(long index1, long index2){
+        long pageId=pageIdFromOffset(index1);
+        int start=(int)(index1%(long)dataPageSize), end=dataPageSize;
+        try(PageCursor cursor= nodePrev.io(pageId,PagedFile.PF_SHARED_READ_LOCK)){
+            clearPage(cursor,pageId, start, dataPageSize);
+            pageId++;
+            long pageId2=pageIdFromOffset(index2);
+            while (pageId<pageId2) {
+                clearPage(cursor, pageId, 0,dataPageSize);
+                pageId++;
+            }
+            clearPage(cursor, pageId2, 0, (int)(index2%(long)dataPageSize));
+        }catch (IOException e){
+            throw new UnderlyingStorageException(e);
+        }
+    }
+
     public NeRelationshipStore(String filename, PageCache pageCache) {
         this.pageCache = pageCache;
         this.filename = filename;
@@ -54,6 +89,8 @@ public class NeRelationshipStore {
         currentOffset = 0;
         offsets = new ArrayList<>();
     }
+
+
 
     public void initialise(boolean createIfNotExists) {
         try {
@@ -289,8 +326,12 @@ public class NeRelationshipStore {
      */
 
     void loadNodeData(long nodeId, long pageData) {
-        if (pageData == -1) {
-
+        if (pageData != -1) {
+            try(PageCursor cursor=metadataStore.io(0,PagedFile.PF_SHARED_READ_LOCK)) {
+//                  long count=
+            }catch (IOException e){
+                throw new UnderlyingStorageException(e);
+            }
         }
     }
 
