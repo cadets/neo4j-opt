@@ -99,7 +99,7 @@ public class NeGraphRelationshipStore extends RelationshipStore {
             recordCache.get(id).copy(record);
             return;
         }
-        store.readIntoRecord(id, record, mode, cursor);
+        store.readIntoRecord(id, record, mode);
         RelationshipRecord duplicate=record.clone();
         super.readIntoRecord(id, record, mode, cursor);
         if(!duplicate.equals(record)){
@@ -137,6 +137,7 @@ public class NeGraphRelationshipStore extends RelationshipStore {
     /**************************************************************************************************************/
     @Override
     void initialise(boolean createIfNotExists) {
+        store.initialise(createIfNotExists);
         super.initialise(createIfNotExists);
     }
 

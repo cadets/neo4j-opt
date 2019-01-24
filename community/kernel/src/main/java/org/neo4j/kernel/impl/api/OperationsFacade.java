@@ -324,7 +324,7 @@ public class OperationsFacade
         try ( Cursor<NodeItem> node = dataRead().nodeCursorById( statement, nodeId ) )
         {
             Value temp=dataRead().nodeGetProperty( statement, node.get(), propertyKeyId );
-            globalCache.nodeAddProperty(nodeId,propertyKeyId,temp);
+            //globalCache.nodeAddProperty(nodeId,propertyKeyId,temp);
             return temp;
         }
     }
