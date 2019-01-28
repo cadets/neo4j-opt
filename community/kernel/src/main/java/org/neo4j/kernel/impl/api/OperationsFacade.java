@@ -258,7 +258,7 @@ public class OperationsFacade
         {
             return false;
         }
-
+/*
         if(localCache.nodeHasLabel(nodeId, labelId)){
             return true;
         }
@@ -266,7 +266,7 @@ public class OperationsFacade
         if(globalCache.nodeHasLabel(nodeId, labelId)){
             return true;
         }
-
+*/
         try ( Cursor<NodeItem> node = dataRead().nodeCursorById( statement, nodeId ) )
         {
             return node.get().hasLabel( labelId );
@@ -291,14 +291,14 @@ public class OperationsFacade
         {
             return false;
         }
-        if(localCache.nodeHasProperty(nodeId, propertyKeyId)){
+/*        if(localCache.nodeHasProperty(nodeId, propertyKeyId)){
             return true;
         }
 
         if(globalCache.nodeHasProperty(nodeId, propertyKeyId)){
             return true;
         }
-
+*/
         try ( Cursor<NodeItem> node = dataRead().nodeCursorById( statement, nodeId ) )
         {
             return dataRead().nodeHasProperty( statement, node.get(), propertyKeyId );
@@ -313,14 +313,14 @@ public class OperationsFacade
         {
             return Values.NO_VALUE;
         }
-         if(localCache.nodeHasProperty(nodeId, propertyKeyId)){
+/*         if(localCache.nodeHasProperty(nodeId, propertyKeyId)){
             return localCache.nodeGetProperty(nodeId, propertyKeyId);
         }
 
         if(globalCache.nodeHasProperty(nodeId, propertyKeyId)){
             return globalCache.nodeGetProperty(nodeId, propertyKeyId);
         }
-
+*/
         try ( Cursor<NodeItem> node = dataRead().nodeCursorById( statement, nodeId ) )
         {
             Value temp=dataRead().nodeGetProperty( statement, node.get(), propertyKeyId );
@@ -412,14 +412,14 @@ public class OperationsFacade
         {
             return false;
         }
-        if(localCache.relationHasProperty(relationshipId, propertyKeyId)){
+/*        if(localCache.relationHasProperty(relationshipId, propertyKeyId)){
             return true;
         }
 
         if(globalCache.relationHasProperty(relationshipId, propertyKeyId)){
             return true;
         }
-
+*/
         try ( Cursor<RelationshipItem> relationship = dataRead().relationshipCursorById( statement, relationshipId ) )
         {
             return dataRead().relationshipHasProperty( statement, relationship.get(), propertyKeyId );
@@ -434,13 +434,15 @@ public class OperationsFacade
         {
             return Values.NO_VALUE;
         }
-         if(localCache.relationHasProperty(relationshipId, propertyKeyId)){
+/*
+        if(localCache.relationHasProperty(relationshipId, propertyKeyId)){
             return localCache.relationGetProperty(relationshipId, propertyKeyId);
         }
 
         if(globalCache.relationHasProperty(relationshipId, propertyKeyId)){
             return globalCache.relationGetProperty(relationshipId, propertyKeyId);
         }
+*/
         try ( Cursor<RelationshipItem> relationship = dataRead().relationshipCursorById( statement, relationshipId ) )
         {
             return dataRead().relationshipGetProperty( statement, relationship.get(), propertyKeyId );
@@ -918,7 +920,7 @@ public class OperationsFacade
             throws EntityNotFoundException, ConstraintValidationException
     {
         statement.assertOpen();
-        localCache.nodeAddLabel(nodeId,labelId,null);
+//        localCache.nodeAddLabel(nodeId,labelId,null);
         return dataWrite().nodeAddLabel( statement, nodeId, labelId );
     }
 
@@ -926,7 +928,7 @@ public class OperationsFacade
     public boolean nodeRemoveLabel( long nodeId, int labelId ) throws EntityNotFoundException
     {
         statement.assertOpen();
-        localCache.nodeRemoveLabel(nodeId, labelId);
+//        localCache.nodeRemoveLabel(nodeId, labelId);
         return dataWrite().nodeRemoveLabel( statement, nodeId, labelId );
     }
 
@@ -936,7 +938,7 @@ public class OperationsFacade
                    InvalidTransactionTypeKernelException, ConstraintValidationException
     {
         statement.assertOpen();
-        localCache.nodeAddProperty(nodeId, propertyKeyId, value);
+//        localCache.nodeAddProperty(nodeId, propertyKeyId, value);
 //        globalCache.nodeAddProperty(nodeId, propertyKeyId, value);
         return dataWrite().nodeSetProperty( statement, nodeId, propertyKeyId, value );
     }
@@ -946,7 +948,7 @@ public class OperationsFacade
             throws EntityNotFoundException, AutoIndexingKernelException, InvalidTransactionTypeKernelException
     {
         statement.assertOpen();
-        localCache.relationAddProperty(relationshipId, propertyKeyId, value);
+//        localCache.relationAddProperty(relationshipId, propertyKeyId, value);
         return dataWrite().relationshipSetProperty( statement, relationshipId, propertyKeyId, value );
     }
 
@@ -962,7 +964,7 @@ public class OperationsFacade
             throws EntityNotFoundException, AutoIndexingKernelException, InvalidTransactionTypeKernelException
     {
         statement.assertOpen();
-        localCache.nodeRemoveProperty(nodeId, propertyKeyId);
+//        localCache.nodeRemoveProperty(nodeId, propertyKeyId);
         return dataWrite().nodeRemoveProperty( statement, nodeId, propertyKeyId );
     }
 
@@ -971,7 +973,7 @@ public class OperationsFacade
             throws EntityNotFoundException, AutoIndexingKernelException, InvalidTransactionTypeKernelException
     {
         statement.assertOpen();
-        localCache.relationRemoveProperty(relationshipId, propertyKeyId);
+//        localCache.relationRemoveProperty(relationshipId, propertyKeyId);
         return dataWrite().relationshipRemoveProperty( statement, relationshipId, propertyKeyId );
     }
 

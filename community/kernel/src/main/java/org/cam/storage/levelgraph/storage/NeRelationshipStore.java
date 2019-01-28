@@ -9,6 +9,7 @@ import org.neo4j.kernel.impl.store.record.RelationshipRecord;
 
 import java.io.*;
 import java.nio.file.NoSuchFileException;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -21,7 +22,7 @@ import static org.neo4j.io.pagecache.PageCacheOpenOptions.ANY_PAGE_SIZE;
  * No edgeid separately provided as the edgeid maps directly to the storage.
  */
 
-public class NeRelationshipStore {
+public class NeRelationshipStore implements AutoCloseable{
 
     public class StorageType {
         int recordSize;
@@ -58,7 +59,7 @@ public class NeRelationshipStore {
 
         public PageCursor moveCursorToBlock(long block, PageCursor cursor) throws IOException {
             long pageId = pageIdFromDataId(block);
-            int blockOffset = (int) ((block * recordSize) % pageSize);
+            int blockOffset = pageOffsetFromId(block);
             cursor.next(pageId);
             cursor.setOffset(blockOffset);
             return cursor;
@@ -98,13 +99,17 @@ public class NeRelationshipStore {
                 throw new UnderlyingStorageException(e);
             }
         }
+        public void close(){
+            readCursor.close();
+            writeCursor.close();
+        }
     }
 
     private static final int recordStorePageSize = 4092, skipListPageSize = 4047, nodeHeader = 25, alignedPageSize = 4096;
     private static final int recordSize = 6, recordsPerPage = recordStorePageSize / recordSize;
    /*
-   Record: 48 bits. with 4 bits of flag and 44 bits of node id and node offset data.
-   6 bits of offset and 16 bits of id for each node.
+    Record: 48 bits. with 4 bits of flag and 44 bits of node id and node offset data.
+    2 bits of offset and 20 bits of id for each node.
     */
 
     /*
@@ -135,22 +140,19 @@ ount, prevblock, nextblock, 4* nodeIds
         nodeOffset = new HashMap<>();
         currentOffset = 0;
         offsets = new ArrayList<>();
-        recordWrapper = new StorageType(6, 4092);
-        skipListWrapper = new StorageType(57, 4047, 2);
-        skipTailWrapper = new StorageType(8, 4096);
-        offsetWrapper = new StorageType(8, 4096);
+        recordWrapper = new StorageType(recordSize, recordStorePageSize);
+        skipListWrapper = new StorageType(57, skipListPageSize, 2);
+        skipTailWrapper = new StorageType(8, alignedPageSize);
+        offsetWrapper = new StorageType(8, alignedPageSize);
     }
 
-    private void loadStores() throws IOException {
-        recordWrapper.initialise(pageCache.map(new File(filename), recordStorePageSize, ANY_PAGE_SIZE));
-        skipListWrapper.initialise(pageCache.map(new File(filename + ".meta"), skipListPageSize, ANY_PAGE_SIZE));
-        skipTailWrapper.initialise(pageCache.map(new File(filename + ".nodep"), alignedPageSize, ANY_PAGE_SIZE));
-        offsetWrapper.initialise(pageCache.map(new File(filename + ".offset"), alignedPageSize, ANY_PAGE_SIZE));
-    }
 
     public void initialise(boolean createIfNotExists) {
         try {
-            loadStores();
+            recordWrapper.initialise(pageCache.map(new File(filename), recordStorePageSize, ANY_PAGE_SIZE));
+            skipListWrapper.initialise(pageCache.map(new File(filename + ".meta"), skipListPageSize, ANY_PAGE_SIZE));
+            skipTailWrapper.initialise(pageCache.map(new File(filename + ".nodep"), alignedPageSize, ANY_PAGE_SIZE));
+            offsetWrapper.initialise(pageCache.map(new File(filename + ".offset"), alignedPageSize, ANY_PAGE_SIZE));
             PageCursor cursor = offsetWrapper.getReadPageCursor();
 
             while (cursor.next()) {
@@ -174,7 +176,10 @@ ount, prevblock, nextblock, 4* nodeIds
 
     private void createStore() {
         try {
-            loadStores();
+            recordWrapper.initialise(pageCache.map(new File(filename), recordStorePageSize, StandardOpenOption.CREATE));
+            skipTailWrapper.initialise(pageCache.map(new File(filename + ".meta"), skipListPageSize, StandardOpenOption.CREATE));
+            skipTailWrapper.initialise(pageCache.map(new File(filename + ".nodep"), alignedPageSize, StandardOpenOption.CREATE));
+            offsetWrapper.initialise(pageCache.map(new File(filename + ".offset"), alignedPageSize, StandardOpenOption.CREATE));
             offsets.add((long) 0);
             offsetFlush(0);
             PageCursor cursor = skipTailWrapper.getWritePageCursor();
@@ -190,6 +195,7 @@ ount, prevblock, nextblock, 4* nodeIds
     private boolean sameMegaBlock(long a, long b){
         return (a>>20)==(b>>20);
     }
+
     void createSkipListBlock(long nodeId, long relationId) {
         if (!nodeOffset.containsKey(nodeId)) {
             long tail;
@@ -396,6 +402,18 @@ ount, prevblock, nextblock, 4* nodeIds
         } while (cursor.shouldRetry());
     }
 
+    public boolean isInUse(long id){
+        PageCursor cursor = recordWrapper.getReadPageCursor();
+        try {
+            cursor = recordWrapper.moveCursorToBlock(id, cursor);
+            byte header = cursor.getByte();
+            boolean inUse = (header & 0x1) != 0;
+            return inUse;
+        }catch (IOException e){
+            throw new UnderlyingStorageException(e);
+        }
+    }
+
     private void updateEdgeRecordData(RelationshipRecord record, byte lagging) {
         long id = record.getId();
         try {
@@ -445,6 +463,13 @@ ount, prevblock, nextblock, 4* nodeIds
         cursor.putLong(offset, currentOffset);
     }
 
+    @Override
+    public void close(){
+        recordWrapper.close();
+        skipListWrapper.close();
+        skipTailWrapper.close();
+        offsetWrapper.close();
+    }
 
     class OffsetData {
         long begin;

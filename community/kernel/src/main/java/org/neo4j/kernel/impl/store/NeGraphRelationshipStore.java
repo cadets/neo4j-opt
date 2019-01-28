@@ -20,7 +20,6 @@
 package org.neo4j.kernel.impl.store;
 
 import org.cam.storage.levelgraph.storage.NeRelationshipStore;
-import org.cam.storage.levelgraph.storage.ondiskstorage.FileStorageLayerInterface;
 import org.neo4j.helpers.collection.Visitor;
 import org.neo4j.io.pagecache.PageCache;
 import org.neo4j.io.pagecache.PageCursor;
@@ -28,14 +27,15 @@ import org.neo4j.io.pagecache.PagedFile;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.store.format.RecordFormats;
 import org.neo4j.kernel.impl.store.format.standard.RelationshipRecordFormat;
+import org.neo4j.kernel.impl.store.id.IdGenerator;
 import org.neo4j.kernel.impl.store.id.IdGeneratorFactory;
 import org.neo4j.kernel.impl.store.id.IdRange;
 import org.neo4j.kernel.impl.store.id.IdType;
 import org.neo4j.kernel.impl.store.record.RecordLoad;
 import org.neo4j.kernel.impl.store.record.RelationshipRecord;
+import org.neo4j.logging.Log;
 import org.neo4j.logging.LogProvider;
 import org.neo4j.logging.Logger;
-import org.rocksdb.RocksDBException;
 
 import java.io.File;
 import java.io.IOException;
@@ -46,10 +46,11 @@ import static org.neo4j.io.pagecache.PagedFile.PF_SHARED_WRITE_LOCK;
 
 
 public class NeGraphRelationshipStore extends RelationshipStore {
-    FileStorageLayerInterface fileStorageLayerInterface;
     NeRelationshipStore store;
     private HashMap<Long, RelationshipRecord> recordCache;
-    private Deque<Long> updatedSinceLastFlush;
+    protected final Log log;
+    private IdGenerator idGenerator;
+    protected final IdGeneratorFactory idGeneratorFactory;
 
     public NeGraphRelationshipStore(
             File fileName,
@@ -62,10 +63,10 @@ public class NeGraphRelationshipStore extends RelationshipStore {
         super(fileName, configuration, idGeneratorFactory,
                 pageCache, logProvider, recordFormats,
                 openOptions);
-        store = new NeRelationshipStore(fileName.getPath() + "nerelation", pageCache);
+        this.idGeneratorFactory=idGeneratorFactory;
+        store = new NeRelationshipStore(fileName.getPath() + ".nerelation", pageCache);
         recordCache = new HashMap<>();
-        updatedSinceLastFlush = new ArrayDeque<>();
-        fileStorageLayerInterface = new FileStorageLayerInterface(fileName.getPath() + "negraph");
+        this.log = logProvider.getLog( getClass() );
     }
 
     /**
@@ -82,13 +83,16 @@ public class NeGraphRelationshipStore extends RelationshipStore {
         if (recordCache.containsKey(id)) {
             return recordCache.get(id).copy(record);
         }
+//        RelationshipRecord duplicate=record.clone();
         store.getRecord(id, record, mode);
-        RelationshipRecord duplicate=record.clone();
-//            fileStorageLayerInterface.returnRecord(id, record);
-        super.getRecord(id, record, mode);
-        if(!duplicate.equals(record)){
+//        super.getRecord(id, record, mode);
+/*        if(!duplicate.equals(record)){
+            log.debug("Get Record not valid");
+            System.out.println("Get record not valid");
             duplicate.equals(record);
         }
+*/
+        //return duplicate;
         return record;
     }
 
@@ -99,13 +103,16 @@ public class NeGraphRelationshipStore extends RelationshipStore {
             recordCache.get(id).copy(record);
             return;
         }
+//        RelationshipRecord duplicate=record.clone();
         store.readIntoRecord(id, record, mode);
-        RelationshipRecord duplicate=record.clone();
-        super.readIntoRecord(id, record, mode, cursor);
-        if(!duplicate.equals(record)){
+   //     super.readIntoRecord(id, record, mode, cursor);
+  /*      if(!duplicate.equals(record)){
+            log.debug("Read into record not valid");
             duplicate.equals(record);
         }
+*/
     }
+
 
     @Override
     public void updateRecord(RelationshipRecord record) {
@@ -126,18 +133,19 @@ public class NeGraphRelationshipStore extends RelationshipStore {
             freeId(record.getSecondaryUnitId());
             return;
         }
-        store.updateRecord(record);
         RelationshipRecord duplicate=record.clone();
-        super.updateRecord(record);
-        if(!duplicate.equals(record)){
-            duplicate.equals(record);
-        }
+        store.updateRecord(duplicate);
+//        super.updateRecord(record);
+//        if(!duplicate.equals(record)){
+//            log.debug("Update record not valid");
+//            duplicate.equals(record);
+//        }
     }
 
     /**************************************************************************************************************/
     @Override
     void initialise(boolean createIfNotExists) {
-        store.initialise(createIfNotExists);
+//        store.initialise(createIfNotExists);
         super.initialise(createIfNotExists);
     }
 
@@ -193,7 +201,8 @@ public class NeGraphRelationshipStore extends RelationshipStore {
 
     @Override
     public boolean isInUse(long id) {
-        return super.isInUse(id);
+        return store.isInUse(id);
+//        return super.isInUse(id);
     }
 
     @Override
@@ -366,6 +375,7 @@ public class NeGraphRelationshipStore extends RelationshipStore {
      */
     @Override
     public void close() {
+        store.close();
         super.close();
     }
 
