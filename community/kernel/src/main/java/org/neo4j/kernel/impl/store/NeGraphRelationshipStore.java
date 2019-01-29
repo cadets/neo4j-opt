@@ -145,7 +145,7 @@ public class NeGraphRelationshipStore extends RelationshipStore {
     /**************************************************************************************************************/
     @Override
     void initialise(boolean createIfNotExists) {
-//        store.initialise(createIfNotExists);
+        store.initialise(createIfNotExists);
         super.initialise(createIfNotExists);
     }
 

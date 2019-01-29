@@ -177,7 +177,7 @@ ount, prevblock, nextblock, 4* nodeIds
     private void createStore() {
         try {
             recordWrapper.initialise(pageCache.map(new File(filename), recordStorePageSize, StandardOpenOption.CREATE));
-            skipTailWrapper.initialise(pageCache.map(new File(filename + ".meta"), skipListPageSize, StandardOpenOption.CREATE));
+            skipListWrapper.initialise(pageCache.map(new File(filename + ".meta"), skipListPageSize, StandardOpenOption.CREATE));
             skipTailWrapper.initialise(pageCache.map(new File(filename + ".nodep"), alignedPageSize, StandardOpenOption.CREATE));
             offsetWrapper.initialise(pageCache.map(new File(filename + ".offset"), alignedPageSize, StandardOpenOption.CREATE));
             offsets.add((long) 0);
