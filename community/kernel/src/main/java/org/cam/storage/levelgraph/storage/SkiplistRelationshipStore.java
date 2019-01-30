@@ -24,7 +24,7 @@ import static org.neo4j.io.pagecache.PageCacheOpenOptions.ANY_PAGE_SIZE;
  * No edgeid separately provided as the edgeid maps directly to the storage.
  */
 
-public class NeRelationshipStore implements AutoCloseable{
+public class SkiplistRelationshipStore implements AutoCloseable{
 
     public class StorageType {
         int recordSize;
@@ -119,7 +119,7 @@ public class NeRelationshipStore implements AutoCloseable{
     }
 
     private static final int recordStorePageSize = 4092, skipListPageSize = 4047, nodeHeader = 25, alignedPageSize = 4096;
-    private static final int recordSize = 6, recordsPerPage = recordStorePageSize / recordSize;
+    private static final int recordSize = 11, recordsPerPage = recordStorePageSize / recordSize;
    /*
     Record: 48 bits. with 4 bits of flag and 44 bits of node id and node offset data.
     2 bits of offset and 20 bits of id for each node.
@@ -141,14 +141,14 @@ ount, prevblock, nextblock, 4* nodeIds
      */
 
     protected final Log log;
-    private StorageType recordWrapper, skipListWrapper, skipTailWrapper, offsetWrapper;
+    private StorageType recordWrapper, skipListWrapper, tailPointerWrapper, offsetWrapper;
     private ArrayList<Long> offsets;
     private HashMap<Long, OffsetData> nodeOffset;
     private long currentOffset, highestNodeId, highestEdgeId;
     private PageCache pageCache;
     private String filename;
 
-    public NeRelationshipStore(
+    public SkiplistRelationshipStore(
             String filename,
             PageCache pageCache,
             LogProvider logProvider) {
@@ -159,7 +159,7 @@ ount, prevblock, nextblock, 4* nodeIds
         offsets = new ArrayList<>();
         recordWrapper = new StorageType(recordSize, recordStorePageSize);
         skipListWrapper = new StorageType(57, skipListPageSize, 2);
-        skipTailWrapper = new StorageType(8, alignedPageSize);
+        tailPointerWrapper = new StorageType(8, alignedPageSize);
         offsetWrapper = new StorageType(8, alignedPageSize);
         this.log = logProvider.getLog( getClass() );
     }
@@ -169,7 +169,7 @@ ount, prevblock, nextblock, 4* nodeIds
         try {
             recordWrapper.initialise(pageCache.map(new File(filename), recordStorePageSize, ANY_PAGE_SIZE));
             skipListWrapper.initialise(pageCache.map(new File(filename + ".meta"), skipListPageSize, ANY_PAGE_SIZE));
-            skipTailWrapper.initialise(pageCache.map(new File(filename + ".nodep"), alignedPageSize, ANY_PAGE_SIZE));
+            tailPointerWrapper.initialise(pageCache.map(new File(filename + ".nodep"), alignedPageSize, ANY_PAGE_SIZE));
             offsetWrapper.initialise(pageCache.map(new File(filename + ".offset"), alignedPageSize, ANY_PAGE_SIZE));
             PageCursor cursor = offsetWrapper.getReadPageCursor();
 
@@ -196,11 +196,11 @@ ount, prevblock, nextblock, 4* nodeIds
         try {
             recordWrapper.initialise(pageCache.map(new File(filename), recordStorePageSize, StandardOpenOption.CREATE));
             skipListWrapper.initialise(pageCache.map(new File(filename + ".meta"), skipListPageSize, StandardOpenOption.CREATE));
-            skipTailWrapper.initialise(pageCache.map(new File(filename + ".nodep"), alignedPageSize, StandardOpenOption.CREATE));
+            tailPointerWrapper.initialise(pageCache.map(new File(filename + ".nodep"), alignedPageSize, StandardOpenOption.CREATE));
             offsetWrapper.initialise(pageCache.map(new File(filename + ".offset"), alignedPageSize, StandardOpenOption.CREATE));
             offsets.add((long) 0);
             offsetFlush(0);
-            PageCursor cursor = skipTailWrapper.getWritePageCursor();
+            PageCursor cursor = tailPointerWrapper.getWritePageCursor();
             cursor.putLong(-1);
             cursor.putLong(-1);
             highestEdgeId = -1;
@@ -218,14 +218,14 @@ ount, prevblock, nextblock, 4* nodeIds
         if (!nodeOffset.containsKey(nodeId)) {
             long tail;
             if (nodeId >= highestNodeId) {
-                skipTailWrapper.cleanRange(highestNodeId + 1, nodeId + 1);
+                tailPointerWrapper.cleanRange(highestNodeId + 1, nodeId + 1);
                 highestNodeId = nodeId;
                 initialiseNodeBlock(currentOffset, nodeId, -1);
                 currentOffset++;
             }
             try {
-                PageCursor cursor = skipTailWrapper.getWritePageCursor();
-                cursor = skipTailWrapper.moveCursorToBlock(nodeId, cursor);
+                PageCursor cursor = tailPointerWrapper.getWritePageCursor();
+                cursor = tailPointerWrapper.moveCursorToBlock(nodeId, cursor);
                 tail = cursor.getLong();
                 if (tail == 0xffffffff||!sameMegaBlock(tail, currentOffset) ) {
                     long prev=-1;
@@ -233,7 +233,7 @@ ount, prevblock, nextblock, 4* nodeIds
                         prev=tail;
                     }
                     initialiseNodeBlock(currentOffset, nodeId, prev);
-                    cursor = skipTailWrapper.moveCursorToBlock(nodeId, cursor);
+                    cursor = tailPointerWrapper.moveCursorToBlock(nodeId, cursor);
                     cursor.putLong(currentOffset);
                     nodeOffset.put(nodeId, new OffsetData(currentOffset, 0));
                     currentOffset++;
@@ -246,7 +246,6 @@ ount, prevblock, nextblock, 4* nodeIds
             } catch (IOException e) {
                 throw new UnderlyingStorageException(e);
             }
-
         }
         try {
             PageCursor cursor = skipListWrapper.getWritePageCursor();
@@ -259,7 +258,7 @@ ount, prevblock, nextblock, 4* nodeIds
             OffsetData data = nodeOffset.get(nodeId);
             cursor = skipListWrapper.moveCursorToBlock(data.begin, cursor);
             cursor.putLong(skipListWrapper.pageOffsetFromId(data.begin) + nodeHeader + data.count * 8, relationId);
-            data.count++;
+            nodeOffset.get(nodeId).count++;
             cursor.putByte(skipListWrapper.pageOffsetFromId(data.begin)+8,(byte) data.count);
         } catch (IOException e) {
             throw new UnderlyingStorageException(e);
@@ -283,13 +282,20 @@ ount, prevblock, nextblock, 4* nodeIds
             createSkipListBlock(record.getSecondNode(), record.getId());
             int secondNode=(int)(nodeOffset.get(record.getSecondNode()).begin)&(0xffff);
             int secondOffset=nodeOffset.get(record.getSecondNode()).count;
-            byte[] data=new byte[6];
-            data[0]=(byte)(((secondOffset&0x3)<<4)+((firstOffset&0x3)<<6));
+            byte[] data=new byte[11];
+            data[0]=(byte)(((secondOffset&0x3)<<4)|((firstOffset&0x3)<<6));
             data[1]=(byte)(firstNode&0xff);
             data[2]=(byte)((firstNode>>8)&0xff);
             data[3]=(byte)(secondNode&0xff);
             data[4]=(byte)((secondNode>>8)&0xff);
-            data[5]=(byte)(((firstNode>>16)&0xf) +(((secondNode>>16)&0xf)<<4));
+            data[5]=(byte)(((firstNode>>16)&0xf) |(((secondNode>>16)&0xf)<<4));
+
+            long nextProp = record.getNextProp();
+            data[6]=(byte)(nextProp&0xff);
+            data[7]=(byte)((nextProp>>8)&0xff);
+            data[8]=(byte)((nextProp>>16)&0xff);
+            data[9]=(byte)((nextProp>>24)&0xff);
+            data[10]=(byte)((nextProp>>32)&0xff);
             if (record.inUse()) {
                 data[0] += 1;
             }
@@ -333,6 +339,7 @@ ount, prevblock, nextblock, 4* nodeIds
         return record;
     }
 
+
     private void getRelationData(int node, int offset, boolean first, RelationshipRecord record) {
         try {
             PageCursor cursor = skipListWrapper.getReadPageCursor();
@@ -370,7 +377,7 @@ ount, prevblock, nextblock, 4* nodeIds
 
                                     //PageCursor cursor2 = recordWrapper.getReadPageCursor();
                                     //do {
-                                    cursor = skipTailWrapper.moveCursorToBlock(page, cursor);
+                                    cursor = tailPointerWrapper.moveCursorToBlock(page, cursor);
                                     int count2 = cursor.getInt(skipListWrapper.pageOffsetFromId(page) + 8);
                                     long prev = cursor.getLong(skipListWrapper.pageOffsetFromId(page) + (count2 - 1) * 8 + nodeHeader);
                                     if (first) {
@@ -389,7 +396,7 @@ ount, prevblock, nextblock, 4* nodeIds
                         cursor = skipListWrapper.moveCursorToBlock(node, cursor);
                         long page = cursor.getLong(skipListWrapper.pageOffsetFromId(node) + 17);
                         try{
-                            cursor = skipTailWrapper.moveCursorToBlock(page, cursor);
+                            cursor = tailPointerWrapper.moveCursorToBlock(page, cursor);
                             //(PageCursor
                         //} cursor2 = recordStore.io(0, PagedFile.PF_SHARED_READ_LOCK)) {
 //                            do {
@@ -421,19 +428,24 @@ ount, prevblock, nextblock, 4* nodeIds
         boolean inUse;
         cursor = recordWrapper.moveCursorToBlock(id, cursor);
         record.setInUse(false);
-        byte[] data=new byte[6];
-        cursor.getBytes(data,0,6);
+        byte[] data=new byte[11];
+        cursor.getBytes(data);
         inUse = (data[0] & 0x1) != 0;
         record.setInUse(inUse);
         if (mode.shouldLoad(inUse)) {
             record.setFirstInFirstChain((data[0] & 0x2) != 0);
             record.setFirstInSecondChain((data[0] & 0x4) != 0);
-            firstNode = (int) (data[1]) + (((int) data[2]) << 8)+(((int) data[5]&0xf)<<16);
+            firstNode = (int) (data[1]) | (((int) data[2]) << 8)|(((int) data[5]&0xf)<<16);
             firstNode+=offsets.get((int)(id>>20));
-            secondNode = (int) (data[3]) + (((int) data[4]) << 8) +(((int) data[5]&0xf0)<<12);
+            secondNode = (int) (data[3]) | (((int) data[4]) << 8) |(((int) data[5]&0xf0)<<12);
             secondNode+=offsets.get((int)(id>>20));
             firstOffset = (data[0]>>6) & (0x3);
             secondOffset = (data[0]>>4)&0x3;
+            long nextProp=((long)data[6])|(((long)data[7])<<8)|(((long)data[8])<<16)|(((long)data[9])<<24)|(((long)data[10])<<32);
+            if(nextProp<0){
+                nextProp=-1;
+            }
+            record.setNextProp(nextProp);
             getRelationData(firstNode, firstOffset, true, record);
             getRelationData(secondNode, secondOffset, false, record);
         }
@@ -454,7 +466,6 @@ ount, prevblock, nextblock, 4* nodeIds
     private void updateEdgeRecordData(RelationshipRecord record, byte lagging) {
         long id = record.getId();
         try {
-
             byte header = lagging;
             if (record.inUse()) {
                 header = 1;
@@ -467,28 +478,38 @@ ount, prevblock, nextblock, 4* nodeIds
             }
             PageCursor cursor = recordWrapper.getWritePageCursor();
             cursor = recordWrapper.moveCursorToBlock(id, cursor);
-            cursor.putByte(header);
+            byte[] data=new byte[11];
+            cursor.getBytes(data);
+            data[0]=header;
+            long nextProp = record.getNextProp();
+            data[6]=(byte)(nextProp&0xff);
+            data[7]=(byte)((nextProp>>8)&0xff);
+            data[8]=(byte)((nextProp>>16)&0xff);
+            data[9]=(byte)((nextProp>>24)&0xff);
+            data[10]=(byte)((nextProp>>32)&0xff);
+            cursor.putBytes(data);
         } catch (IOException e) {
             throw new UnderlyingStorageException(e);
         }
     }
 
     private void initialiseNodeBlock(long offset, long nodeId, long prev) {
-        PageCursor cursor = skipListWrapper.getWritePageCursor();
         try {
-            cursor = skipTailWrapper.moveCursorToBlock(nodeId, cursor);
-            cursor.putLong(offset);
-            if (prev != -1) {
-                cursor = skipListWrapper.moveCursorToBlock(prev, cursor);
-                cursor.putLong(skipListWrapper.pageOffsetFromId(prev) + 17, offset);
+            PageCursor cursor1=skipListWrapper.getWritePageCursor();
+            cursor1=skipListWrapper.moveCursorToBlock(offset,cursor1);
+            cursor1.putLong(nodeId);
+            cursor1.putByte((byte) 0);
+            cursor1.putLong(prev);
+            cursor1.putLong(-1);
+
+            if(prev!=-1){
+                cursor1=skipListWrapper.moveCursorToBlock(prev,cursor1);
+                cursor1.putLong(skipListWrapper.pageOffsetFromId(prev) + 17, offset);
             }
-            cursor = skipListWrapper.moveCursorToBlock(offset, cursor);
-            cursor.putLong(nodeId);
 
-            cursor.putByte((byte) 0);
-            cursor.putLong(prev);
-            cursor.putLong(-1);
-
+            PageCursor cursor2=tailPointerWrapper.getWritePageCursor();
+            cursor2=tailPointerWrapper.moveCursorToBlock(nodeId,cursor2);
+            cursor2.putLong(offset);
         } catch (IOException e) {
             throw new UnderlyingStorageException(e);
         }
@@ -504,7 +525,7 @@ ount, prevblock, nextblock, 4* nodeIds
     public void close(){
         recordWrapper.close();
         skipListWrapper.close();
-        skipTailWrapper.close();
+        tailPointerWrapper.close();
         offsetWrapper.close();
     }
 
