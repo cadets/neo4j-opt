@@ -213,6 +213,9 @@ public class RelationshipRecord extends PrimitiveRecord
                 secondNode, type, firstPrevRel, firstNextRel, secondPrevRel, secondNextRel, firstInFirstChain,
                 firstInSecondChain );
         record.setSecondaryUnitId( getSecondaryUnitId() );
+        record.setInUse(this.inUse());
+        record.setNextProp(this.getNextProp());
+        if(isCreated())record.setCreated();
         return record;
     }
 

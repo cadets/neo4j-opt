@@ -5,11 +5,14 @@ import org.junit.Before;
 import org.junit.Test;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.pagecache.PageCache;
+import org.neo4j.io.pagecache.impl.muninn.MuninnPageCache;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.StoreFactory;
 import org.neo4j.kernel.impl.store.id.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.impl.store.id.IdGeneratorFactory;
+import org.neo4j.logging.Log;
+import org.neo4j.logging.LogProvider;
 import org.neo4j.logging.NullLogProvider;
 
 import java.io.File;
@@ -28,7 +31,17 @@ public class NeRelationshipStoreTest {
 
     @Before
     public void setUp() throws Exception {
+        neRelationshipStore =new NeRelationshipStore("testFile", new MuninnPageCache(null, 1000, 4096, null, null), new LogProvider() {
+            @Override
+            public Log getLog(Class loggingClass) {
+                return null;
+            }
 
+            @Override
+            public Log getLog(String name) {
+                return null;
+            }
+        });
     }
 
     @After
