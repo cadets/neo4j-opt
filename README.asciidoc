@@ -1,1 +1,1 @@
-Neo4j no longer uses a master branch. Please see https://github.com/neo4j/neo4j/ for the latest development branch.
+Neo4j no longer uses a master branch. Please see the localCache branch for the neo4J optimisation work.
